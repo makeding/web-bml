@@ -4,6 +4,7 @@ import { Interpreter } from "./interpreter/interpreter";
 import { EventDispatcher, EventQueue } from "./event_queue";
 import { Content } from "./content";
 import { ResponseMessage } from "../lib/ws_api";
+import type { AITControlledAppStart } from "./bml_browser";
 import { AudioNodeProvider, Indicator, IP, Reg } from "./bml_browser";
 export type LockedModuleInfo = [moduleName: string, func: number, status: number];
 export interface Browser {
@@ -58,6 +59,7 @@ export interface Browser {
     lockScreen(): number;
     unlockScreen(): number;
     getBrowserSupport(sProvider: string, functionname: string, ...additionalinfo: string[]): number;
+    startAITControlledApp(organizationId: string, applicationId: string, aitUrl: string): number;
     launchDocument(documentName: string, transitionStyle?: string): number;
     quitDocument(): number;
     launchExApp(uriname: string, MIME_type?: string, ...Ex_info: string[]): number;
@@ -119,8 +121,9 @@ export declare class BrowserAPI {
     private readonly indicator?;
     private readonly ureg;
     private readonly greg;
+    private readonly startAITControlledApp?;
     private readonly X_DPA_startResidentApp?;
-    constructor(resources: resource.Resources, eventQueue: EventQueue, eventDispatcher: EventDispatcher, content: Content, nvram: NVRAM, interpreter: Interpreter, audioNodeProvider: AudioNodeProvider, ip: IP, indicator: Indicator | undefined, ureg: Reg | undefined, greg: Reg | undefined, X_DPA_startResidentApp: ((appName: string, showAV: number, returnURI: string, Ex_info: string[]) => number) | undefined);
+    constructor(resources: resource.Resources, eventQueue: EventQueue, eventDispatcher: EventDispatcher, content: Content, nvram: NVRAM, interpreter: Interpreter, audioNodeProvider: AudioNodeProvider, ip: IP, indicator: Indicator | undefined, ureg: Reg | undefined, greg: Reg | undefined, startAITControlledApp: AITControlledAppStart | undefined, X_DPA_startResidentApp: ((appName: string, showAV: number, returnURI: string, Ex_info: string[]) => number) | undefined);
     asyncBrowser: AsyncBrowser;
     getGreg(index: number): string | undefined;
     setGreg(index: number, value: string): void;

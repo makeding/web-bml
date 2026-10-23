@@ -7,6 +7,7 @@ import { EventDispatcher, EventQueue } from "./event_queue";
 import { Content } from "./content";
 import { ResponseMessage } from "../lib/ws_api";
 import { playRomSound } from "./romsound";
+import type { AITControlledAppStart } from "./bml_browser";
 import { AudioNodeProvider, Indicator, IP, Reg } from "./bml_browser";
 import { decodeEUCJP, encodeEUCJP, stripStringEUCJP } from "./euc_jp";
 import { decodeShiftJIS, encodeShiftJIS } from "./shift_jis";
@@ -127,6 +128,7 @@ export interface Browser {
     lockScreen(): number;
     unlockScreen(): number;
     getBrowserSupport(sProvider: string, functionname: string, ...additionalinfo: string[]): number;
+    startAITControlledApp(organizationId: string, applicationId: string, aitUrl: string): number;
     launchDocument(documentName: string, transitionStyle?: string): number;
     // option
     // launchDocumentRestricted(documentName: string, transitionStyle: string): number;
@@ -549,6 +551,7 @@ export class BrowserAPI {
     private readonly indicator?: Indicator;
     private readonly ureg: Reg;
     private readonly greg: Reg;
+    private readonly startAITControlledApp?: AITControlledAppStart;
     private readonly X_DPA_startResidentApp?: (appName: string, showAV: number, returnURI: string, Ex_info: string[]) => number;
 
     constructor(
@@ -563,6 +566,7 @@ export class BrowserAPI {
         indicator: Indicator | undefined,
         ureg: Reg | undefined,
         greg: Reg | undefined,
+        startAITControlledApp: AITControlledAppStart | undefined,
         X_DPA_startResidentApp: ((appName: string, showAV: number, returnURI: string, Ex_info: string[]) => number) | undefined,
     ) {
         this.resources = resources;
@@ -582,6 +586,7 @@ export class BrowserAPI {
             getReg: (index) => this.browser.Greg[index],
             setReg: (index, value) => this.browser.Greg[index] = value,
         };
+        this.startAITControlledApp = startAITControlledApp;
         this.X_DPA_startResidentApp = X_DPA_startResidentApp;
     }
 
@@ -928,6 +933,27 @@ export class BrowserAPI {
             const additionalinfo2: string | undefined = additionalinfoList[1] ?? undefined;
             const additionalinfo3: string | undefined = additionalinfoList[2] ?? undefined;
             if (sProvider === "ARIB") {
+                // The BML engine only reports Hybridcast support when its host
+                // can actually transfer ownership to an AIT-controlled app.
+                if (this.startAITControlledApp == null && (
+                    functionname === "AITControlledApp.Start" ||
+                    functionname === "AITControlledAppEngineFunction" ||
+                    functionname === "AITTransferMethod" ||
+                    functionname === "AITTransportMethod"
+                )) {
+                    return 0;
+                }
+                // The callback presently implements the XML-over-HTTP,
+                // IPTV-F HTML5 phase 0 handoff. Do not advertise other AIT
+                // transports or engines that the host cannot start.
+                if (this.startAITControlledApp != null && (
+                    functionname === "AITControlledApp.Start" ||
+                    (functionname === "AITControlledAppEngineFunction" && additionalinfo === "IPTV-F" && additionalinfo2 === "HTML5_ph0") ||
+                    (functionname === "AITTransferMethod" && additionalinfo === "XML" && additionalinfo2 === "HTTP") ||
+                    (functionname === "AITTransportMethod" && additionalinfo === "XML" && additionalinfo2 === "HTTP")
+                )) {
+                    return 1;
+                }
                 if (functionname === "BMLversion") {
                     if (additionalinfo == null) {
                         return 1;
@@ -1057,6 +1083,19 @@ export class BrowserAPI {
             }
             error("unknown getBrowserSupport", sProvider, functionname, ...additionalinfoList);
             return 0;
+        },
+        startAITControlledApp: (organizationId: string, applicationId: string, aitUrl: string): number => {
+            if (this.startAITControlledApp == null) {
+                return NaN;
+            }
+            return this.startAITControlledApp({
+                organizationId: String(organizationId),
+                applicationId: String(applicationId),
+                aitUrl: String(aitUrl),
+                // A transition must receive a coherent view of the BML state;
+                // its later mutation is owned by the BML runtime.
+                greg: [...new Array(64)].map((_, index) => this.getGreg(index) ?? ""),
+            });
         },
         getBrowserStatus: (sProvider: string, statusname: string, additionalinfo: string): number => {
             log(`getBrowserStatus(${sProvider}, ${statusname}, ${additionalinfo})`);

@@ -17,6 +17,15 @@ export interface EPG {
     tune?(originalNetworkId: number, transportStreamId: number, serviceId: number): boolean | never;
     tuneToComponent?(originalNetworkId: number, transportStreamId: number, serviceId: number, component: string): boolean | never;
 }
+/** Request to transfer a BML application into an AIT-controlled HTML application. */
+export type AITControlledAppStartRequest = {
+    organizationId: string;
+    applicationId: string;
+    aitUrl: string;
+    greg: readonly string[];
+};
+/** Receiver-owned transition from BML into a Hybridcast AIT application. */
+export type AITControlledAppStart = (request: AITControlledAppStartRequest) => number;
 export interface IP {
     isIPConnected?(): number;
     getConnectionType?(): number;
@@ -143,6 +152,11 @@ export type BMLBrowserOptions = {
     inputApplication?: InputApplication;
     ureg?: Reg;
     greg?: Reg;
+    /**
+     * Starts an AIT-controlled HTML application. When absent, BML reports
+     * that the corresponding Hybridcast capabilities are unsupported.
+     */
+    startAITControlledApp?: AITControlledAppStart;
     setMainAudioStreamCallback?: (componentId: number, channelId?: number) => boolean;
     X_DPA_startResidentApp?: (appName: string, showAV: number, returnURI: string, Ex_info: string[]) => number;
     /**

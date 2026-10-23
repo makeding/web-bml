@@ -552,6 +552,16 @@ export function defineBrowserBinding(context: Context, resources: Resources, bro
             return browserAPI.browser.getBrowserSupport(sProvider, functionname, ...additionalinfoListString);
         }, 2, "getBrowserSupport"),
     });
+    browser.properties.set("startAITControlledApp", {
+        ...desc,
+        value: newNativeFunction(context.realm.intrinsics.FunctionPrototype, function* browser$startAITControlledApp(ctx, _self, args, caller) {
+            return browserAPI.browser.startAITControlledApp(
+                yield* toString(ctx, args[0], caller),
+                yield* toString(ctx, args[1], caller),
+                yield* toString(ctx, args[2], caller),
+            );
+        }, 3, "startAITControlledApp"),
+    });
     browser.properties.set("getBrowserStatus", {
         ...desc,
         value: newNativeFunction(context.realm.intrinsics.FunctionPrototype, function* browser$getBrowserStatus(ctx, _self, args, caller) {
