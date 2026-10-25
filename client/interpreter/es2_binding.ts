@@ -552,6 +552,17 @@ export function defineBrowserBinding(context: Context, resources: Resources, bro
             return browserAPI.browser.getBrowserSupport(sProvider, functionname, ...additionalinfoListString);
         }, 2, "getBrowserSupport"),
     });
+    // BML の引数を文字列へ変換し、ホストが所有する AIT 起動処理へ渡す。
+    browser.properties.set("startAITControlledApp", {
+        ...desc,
+        value: newNativeFunction(context.realm.intrinsics.FunctionPrototype, function* browser$startAITControlledApp(ctx, _self, args, caller) {
+            return browserAPI.browser.startAITControlledApp(
+                yield* toString(ctx, args[0], caller),
+                yield* toString(ctx, args[1], caller),
+                yield* toString(ctx, args[2], caller),
+            );
+        }, 3, "startAITControlledApp"),
+    });
     browser.properties.set("getBrowserStatus", {
         ...desc,
         value: newNativeFunction(context.realm.intrinsics.FunctionPrototype, function* browser$getBrowserStatus(ctx, _self, args, caller) {

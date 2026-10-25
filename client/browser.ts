@@ -7,6 +7,7 @@ import { EventDispatcher, EventQueue } from "./event_queue";
 import { Content } from "./content";
 import { ResponseMessage } from "../lib/ws_api";
 import { playRomSound } from "./romsound";
+import type { AITControlledAppStart } from "./bml_browser";
 import { AudioNodeProvider, Indicator, IP, Reg } from "./bml_browser";
 import { decodeEUCJP, encodeEUCJP, stripStringEUCJP } from "./euc_jp";
 import { decodeShiftJIS, encodeShiftJIS } from "./shift_jis";
@@ -127,6 +128,7 @@ export interface Browser {
     lockScreen(): number;
     unlockScreen(): number;
     getBrowserSupport(sProvider: string, functionname: string, ...additionalinfo: string[]): number;
+    startAITControlledApp(organizationId: string, applicationId: string, aitUrl: string): number;
     launchDocument(documentName: string, transitionStyle?: string): number;
     // option
     // launchDocumentRestricted(documentName: string, transitionStyle: string): number;
@@ -549,6 +551,7 @@ export class BrowserAPI {
     private readonly indicator?: Indicator;
     private readonly ureg: Reg;
     private readonly greg: Reg;
+    private readonly startAITControlledApp?: AITControlledAppStart;
     private readonly X_DPA_startResidentApp?: (appName: string, showAV: number, returnURI: string, Ex_info: string[]) => number;
 
     constructor(
@@ -563,6 +566,7 @@ export class BrowserAPI {
         indicator: Indicator | undefined,
         ureg: Reg | undefined,
         greg: Reg | undefined,
+        startAITControlledApp: AITControlledAppStart | undefined,
         X_DPA_startResidentApp: ((appName: string, showAV: number, returnURI: string, Ex_info: string[]) => number) | undefined,
     ) {
         this.resources = resources;
@@ -582,6 +586,7 @@ export class BrowserAPI {
             getReg: (index) => this.browser.Greg[index],
             setReg: (index, value) => this.browser.Greg[index] = value,
         };
+        this.startAITControlledApp = startAITControlledApp;
         this.X_DPA_startResidentApp = X_DPA_startResidentApp;
     }
 
@@ -928,6 +933,26 @@ export class BrowserAPI {
             const additionalinfo2: string | undefined = additionalinfoList[1] ?? undefined;
             const additionalinfo3: string | undefined = additionalinfoList[2] ?? undefined;
             if (sProvider === "ARIB") {
+                // ホストが AIT 管理の HTML アプリへ遷移できない場合は、
+                // BML 側にも Hybridcast の起動機能を非対応として通知する。
+                if (this.startAITControlledApp == null && (
+                    functionname === "AITControlledApp.Start" ||
+                    functionname === "AITControlledAppEngineFunction" ||
+                    functionname === "AITTransferMethod" ||
+                    functionname === "AITTransportMethod"
+                )) {
+                    return 0;
+                }
+                // 現在のホストが扱えるのは HTTP 経由の XML AIT と IPTV-F HTML5 phase 0。
+                // 未実装の転送方式や実行環境まで対応済みとして通知しない。
+                if (this.startAITControlledApp != null && (
+                    functionname === "AITControlledApp.Start" ||
+                    (functionname === "AITControlledAppEngineFunction" && additionalinfo === "IPTV-F" && additionalinfo2 === "HTML5_ph0") ||
+                    (functionname === "AITTransferMethod" && additionalinfo === "XML" && additionalinfo2 === "HTTP") ||
+                    (functionname === "AITTransportMethod" && additionalinfo === "XML" && additionalinfo2 === "HTTP")
+                )) {
+                    return 1;
+                }
                 if (functionname === "BMLversion") {
                     if (additionalinfo == null) {
                         return 1;
@@ -1057,6 +1082,20 @@ export class BrowserAPI {
             }
             error("unknown getBrowserSupport", sProvider, functionname, ...additionalinfoList);
             return 0;
+        },
+        startAITControlledApp: (organizationId: string, applicationId: string, aitUrl: string): number => {
+            // ホストに起動処理がなければ、BML の呼び出し元へ起動失敗を返す。
+            if (this.startAITControlledApp == null) {
+                return NaN;
+            }
+            return this.startAITControlledApp({
+                organizationId: String(organizationId),
+                applicationId: String(applicationId),
+                aitUrl: String(aitUrl),
+                // 遷移時点の汎用レジスターを複製し、
+                // BML 実行中の後続更新が遷移先の初期状態へ混入しないようにする。
+                greg: [...new Array(64)].map((_, index) => this.getGreg(index) ?? ""),
+            });
         },
         getBrowserStatus: (sProvider: string, statusname: string, additionalinfo: string): number => {
             log(`getBrowserStatus(${sProvider}, ${statusname}, ${additionalinfo})`);

@@ -43,6 +43,17 @@ export interface EPG {
     tuneToComponent?(originalNetworkId: number, transportStreamId: number, serviceId: number, component: string): boolean | never;
 }
 
+/** BML から AIT 管理の HTML アプリへ遷移するためにホストへ渡す情報。 */
+export type AITControlledAppStartRequest = {
+    organizationId: string;
+    applicationId: string;
+    aitUrl: string;
+    greg: readonly string[];
+};
+
+/** 受信機側で Hybridcast アプリへの遷移を処理するコールバック。 */
+export type AITControlledAppStart = (request: AITControlledAppStartRequest) => number;
+
 export interface IP {
     isIPConnected?(): number;
     getConnectionType?(): number;
@@ -180,6 +191,11 @@ export type BMLBrowserOptions = {
     inputApplication?: InputApplication;
     ureg?: Reg;
     greg?: Reg;
+    /**
+     * AIT 管理の HTML アプリへの遷移をホストへ委譲する。
+     * 未指定の場合は、対応する Hybridcast 機能を非対応として通知する。
+     */
+    startAITControlledApp?: AITControlledAppStart;
     setMainAudioStreamCallback?: (componentId: number, channelId?: number) => boolean;
     X_DPA_startResidentApp?: (appName: string, showAV: number, returnURI: string, Ex_info: string[]) => number;
     /**
@@ -251,7 +267,7 @@ export class BMLBrowser {
             options.inputApplication,
             options.showErrorMessage
         );
-        this.browserAPI = new BrowserAPI(this.resources, this.eventQueue, this.eventDispatcher, this.content, this.nvram, this.interpreter, audioNodeProvider, options.ip ?? {}, this.indicator, options.ureg, options.greg, options.X_DPA_startResidentApp);
+        this.browserAPI = new BrowserAPI(this.resources, this.eventQueue, this.eventDispatcher, this.content, this.nvram, this.interpreter, audioNodeProvider, options.ip ?? {}, this.indicator, options.ureg, options.greg, options.startAITControlledApp, options.X_DPA_startResidentApp);
         this.interpreter.setupEnvironment(this.browserAPI, this.resources, this.content, this.epg);
         if (options.fonts?.roundGothic) {
             this.fonts.push(new FontFace(bmlBrowserFontNames.roundGothic, options.fonts?.roundGothic.source, options.fonts?.roundGothic.descriptors));
